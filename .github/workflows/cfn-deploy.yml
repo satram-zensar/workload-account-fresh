@@ -1,0 +1,122 @@
+name: Account creation Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      folderPath:
+        description: "Path where template and params.json live (e.g. 'templates')"
+        required: true
+        default: "templates"
+      stackName:
+        description: "Name of CloudFormation stack to deploy"
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (assume role via OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          role-session-name: account_cft_deployment
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Install jq
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Deploy stack
+        shell: bash
+        env:
+          FOLDER: ${{ github.event.inputs.folderPath }}
+          STACK_NAME: ${{ github.event.inputs.stackName }}
+        run: |
+          set -euxo pipefail
+
+          full_path="$FOLDER"
+          echo "Looking in: $full_path"
+
+          # Find a .yaml/.yml template in the folder (first match)
+          template_file=$(find "$full_path" -maxdepth 1 -type f \( -iname "*.yaml" -o -iname "*.yml" \) | head -n 1 || true)
+          params_file="${full_path}/params.json"
+
+          if [[ -z "$template_file" ]]; then
+            echo "ERROR: No template (.yaml/.yml) found in $full_path"
+            ls -la "$full_path" || true
+            exit 1
+          fi
+
+          if [[ ! -f "$params_file" ]]; then
+            echo "ERROR: params.json not found in $full_path"
+            ls -la "$full_path" || true
+            exit 1
+          fi
+
+          echo "Deploying stack '${STACK_NAME}' using:"
+          echo "  Template: $template_file"
+          echo "  Params:   $params_file"
+
+          # Build parameter overrides from params.json (supports object or array)
+          param_overrides=$(jq -r '
+            if (type=="array") then
+              .[] | "\(.ParameterKey)=\(.ParameterValue)"
+            elif (type=="object") then
+              to_entries[] | "\(.key)=\(.value)"
+            else
+              empty
+            end' "$params_file" | paste -sd" " - || true)
+
+          echo "Parameter overrides computed: $param_overrides"
+
+          if ! aws cloudformation deploy \
+            --stack-name "$STACK_NAME" \
+            --template-file "$template_file" \
+            --parameter-overrides $param_overrides \
+            --capabilities CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND \
+            --no-fail-on-empty-changeset; then
+
+            echo "Stack deployment failed. Fetching failure reason..."
+            aws cloudformation describe-stack-events \
+              --stack-name "$STACK_NAME" \
+              --query "StackEvents[?ResourceStatus=='CREATE_FAILED'].{LogicalId:LogicalResourceId,Reason:ResourceStatusReason,ResourceType:ResourceType}" \
+              --output table || echo "Failed to fetch stack events"
+            exit 1
+          fi
+
+      - name: Extract CloudFormation outputs
+        id: get_outputs
+        shell: bash
+        env:
+          STACK_NAME: ${{ github.event.inputs.stackName }}
+        run: |
+          set -euxo pipefail
+
+          echo "Fetching outputs for stack: $STACK_NAME"
+
+          outputs_json=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK_NAME" \
+            --query "Stacks[0].Outputs" \
+            --output json)
+
+          echo "CloudFormation Outputs:"
+          echo "$outputs_json" | jq -r '.'
+
+          echo "$outputs_json" | jq -c '.[]?' | while read -r out; do
+            key=$(echo "$out" | jq -r '.OutputKey // empty')
+            value=$(echo "$out" | jq -r '.OutputValue // empty')
+            if [[ -n "$key" ]]; then
+              echo "${key}=${value}" >> "$GITHUB_OUTPUT"
+              echo "Set output: $key"
+            fi
+          done
