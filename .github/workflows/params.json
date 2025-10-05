@@ -1,0 +1,39 @@
+[
+    {
+        "ParameterKey": "ProductId",
+        "ParameterValue": "test1"
+    },
+    {
+        "ParameterKey": "ProvisioningArtifactId",
+        "ParameterValue": "test2"
+    },
+    {
+        "ParameterKey": "ProvisioningArtifactId2",
+        "ParameterValue": "test3"
+    },
+    {
+        "ParameterKey": "ProvisioningArtifactId3",
+        "ParameterValue": "test4"
+    },
+    {
+        "ParameterKey": "ProvisioningArtifactId4",
+        "ParameterValue": "test5"
+    },
+    {
+        "ParameterKey": "ProvisioningArtifactId5",
+        "ParameterValue": "test6"
+    },
+    {
+        "ParameterKey": "ProvisioningArtifactId6",
+        "ParameterValue": "test7"
+    },
+    {
+        "ParameterKey": "ProvisioningArtifactId7",
+        "ParameterValue": "test8"
+    },
+    {
+        "ParameterKey": "ManagedOrganizationalUnit",
+        "ParameterValue": "test9"
+    }
+ 
+]
