@@ -45,12 +45,11 @@ jobs:
           set -euxo pipefail
 
           full_path="$FOLDER"
-echo "Looking in: $full_path"
+          echo "Looking in: $full_path"
 
-# Find a .yaml/.yml template in the folder (first match)
-template_file=$(find "$full_path" -maxdepth 1 -type f \( -iname "*.yaml" -o -iname "*.yml" \) | head -n 1 || true)
-params_file="${full_path}/params.json"
-
+          # Find a .yaml/.yml template in the folder (first match)
+          template_file=$(find "$full_path" -maxdepth 1 -type f \( -iname "*.yaml" -o -iname "*.yml" \) | head -n 1 || true)
+          params_file="${full_path}/params.json"
 
           if [[ -z "$template_file" ]]; then
             echo "ERROR: No template (.yaml/.yml) found in $full_path"
