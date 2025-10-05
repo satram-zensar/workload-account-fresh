@@ -24,12 +24,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configure AWS credentials (assume role via OIDC)
-  uses: aws-actions/configure-aws-credentials@v4
-  with:
-    role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-    role-session-name: account_cft_deployment
-    aws-region: ${{ secrets.AWS_REGION || 'eu-west-1' }}
-
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          role-session-name: account_cft_deployment
+          aws-region: ${{ secrets.AWS_REGION || 'eu-west-1' }}
 
       - name: Install jq
         run: |
@@ -68,6 +67,7 @@ jobs:
           echo "  Template: $template_file"
           echo "  Params:   $params_file"
 
+          # Build parameter overrides from params.json (supports object or array)
           param_overrides=$(jq -r '
             if (type=="array") then
               .[] | "\(.ParameterKey)=\(.ParameterValue)"
